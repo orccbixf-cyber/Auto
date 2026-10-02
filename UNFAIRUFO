@@ -1,0 +1,213 @@
+-- ==========================================
+-- Auto Block Script for Forsaken
+-- Name: Auto Block
+-- ==========================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Config Settings
+local Config = {
+    AutoBlock = false,
+    BlockDistance = 15,
+    InfStamina = false,
+    ESP = false,
+    AutoGenerator = false,
+    GenSkillCheckOnly = true, -- Auto Great/Perfect Skillcheck
+    AutoPunch = false,
+    PunchDelay = 0.1
+}
+
+-- ScreenGui Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoBlockGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "Auto Block - Forsaken"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+Container.ScrollBarThickness = 4
+Container.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Parent = Container
+
+-- Helper function to create toggles
+local function CreateToggle(name, default, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, -10, 0, 35)
+    Button.BackgroundColor3 = default and Color3.fromRGB(46, 139, 87) or Color3.fromRGB(50, 50, 50)
+    Button.Text = name .. ": " .. (default and "ON" or "OFF")
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.Font = Enum.Font.SourceSans
+    Button.TextSize = 15
+    Button.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Button
+
+    local state = default
+    Button.MouseButton1Click:Connect(function()
+        state = not state
+        Button.BackgroundColor3 = state and Color3.fromRGB(46, 139, 87) or Color3.fromRGB(50, 50, 50)
+        Button.Text = name .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
+    return Button
+end
+
+-- ==========================================
+-- 1. Auto Block (Adjustable)
+-- ==========================================
+CreateToggle("Auto Block", Config.AutoBlock, function(val) Config.AutoBlock = val end)
+
+RunService.RenderStepped:Connect(function()
+    if not Config.AutoBlock then return end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    -- ตรวจหาคิลเลอร์หรือมอนสเตอร์ใกล้เคียงเพื่อทำการ Parry / Block
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and obj ~= char then
+            local dist = (char.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
+            if dist <= Config.BlockDistance then
+                -- จำลองการกดปุ่ม Block (ตั้งค่า Keybind Block ตามในเกม)
+                keypress(0x46) -- 0x46 = ปุ่ม F
+                task.wait(0.05)
+                keyrelease(0x46)
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 2. Infinite Stamina
+-- ==========================================
+CreateToggle("Infinite Stamina", Config.InfStamina, function(val) Config.InfStamina = val end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if Config.InfStamina then
+            local char = LocalPlayer.Character
+            if char then
+                -- ล็อกค่า Stamina ไม่ให้ลดลง
+                local stamina = char:FindFirstChild("Stamina") or char:FindFirstChild("StaminaValue")
+                if stamina then
+                    stamina.Value = stamina.MaxValue or 100
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 3. ESP (Player & Generator Highlight)
+-- ==========================================
+local ESPFolder = Instance.new("Folder", ScreenGui)
+ESPFolder.Name = "ESPFolder"
+
+CreateToggle("ESP", Config.ESP, function(val) 
+    Config.ESP = val 
+    if not val then
+        ESPFolder:ClearAllChildren()
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not Config.ESP then return end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if not ESPFolder:FindFirstChild(player.Name) then
+                local Highlight = Instance.new("Highlight")
+                Highlight.Name = player.Name
+                Highlight.Adornee = player.Character
+                Highlight.FillColor = Color3.fromRGB(255, 50, 50)
+                Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                Highlight.Parent = ESPFolder
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 4. Auto Generator (Adjustable)
+-- ==========================================
+CreateToggle("Auto Generator", Config.AutoGenerator, function(val) Config.AutoGenerator = val end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if Config.AutoGenerator then
+            -- ระบบจัดการมินิเกม Skill Check อัตโนมัติเมื่อซ่อมเครื่อง
+            local gui = LocalPlayer.PlayerGui:FindFirstChild("SkillCheck") or LocalPlayer.PlayerGui:FindFirstChild("Minigame")
+            if gui then
+                -- กด Spacebar อัตโนมัติในจังหวะ Perfect Skill Check
+                keypress(0x20) -- Spacebar
+                task.wait(0.05)
+                keyrelease(0x20)
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 5. Auto Punch (Adjustable)
+-- ==========================================
+CreateToggle("Auto Punch", Config.AutoPunch, function(val) Config.AutoPunch = val end)
+
+task.spawn(function()
+    while true do
+        task.wait(Config.PunchDelay)
+        if Config.AutoPunch then
+            local char = LocalPlayer.Character
+            if char then
+                -- สั่งชก/โจมตีอัตโนมัติ
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    tool:Activate()
+                else
+                    -- ส่งคำสั่งคลิกซ้ายโจมตีเปล่า
+                    mouse1click()
+                end
+            end
+        end
+    end
+end)
